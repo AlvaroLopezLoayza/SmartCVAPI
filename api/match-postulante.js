@@ -64,8 +64,33 @@ Salario: ${o.salario}`).join('\n\n')}
 
     const result = await geminiRes.json()
     const texto = result?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // Extraer las 3 ofertas recomendadas del texto de Gemini
+    // Se asume que Gemini responde con bloques tipo:
+    // Oferta 1:
+    // Empresa: ...
+    // Título: ...
+    // Rubro: ...
+    // Ubicación: ...
+    // Requisitos: ...
+    // Puntaje de afinidad: ...%
 
-    res.status(200).json({ recomendaciones: texto })
+    const regex = /Oferta \d+:\s*Empresa: (.+)\s*Título: (.+)\s*Rubro: (.+)\s*Ubicación: (.+)\s*Requisitos: (.+)\s*Puntaje de afinidad: (\d+)%/g
+    let match
+    const recomendaciones = []
+
+    while ((match = regex.exec(texto)) !== null) {
+      recomendaciones.push({
+        nombre_empresa: match[1].trim(),
+        titulo: match[2].trim(),
+        rubro: match[3].trim(),
+        ubicacion: match[4].trim(),
+        requisitos: match[5].trim(),
+        score_match: Number(match[6])
+      })
+    }
+
+    res.status(200).json({ recomendaciones })
   } catch (error) {
     res.status(500).json({
       error: 'Error al generar recomendaciones',
