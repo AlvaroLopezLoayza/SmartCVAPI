@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
     // Obtener id_empresa usando id_usuario
     const [empresa] = await sql`
-      SELECT id_empresa FROM empresa WHERE idusuario = ${id_usuario}
+      SELECT id_empresa FROM empresa WHERE id_usuario = ${id_usuario}
     `;
     if (!empresa) {
       return res.status(404).json({ error: 'Empresa no encontrada para este usuario' });
