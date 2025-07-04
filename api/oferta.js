@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
   try {
-    const { id_usuario, titulo, descripcion, requisitos, salario } = req.body;
+    const { id_usuario, titulo, descripcion, requisitos, ubicacion, salario } = req.body;
 
     if (!id_usuario || !titulo || !descripcion) {
       return res.status(400).json({ error: 'Campos requeridos faltantes' });
@@ -20,8 +20,8 @@ export default async function handler(req, res) {
     const id_empresa = empresa.id_empresa;
 
     await sql`
-      INSERT INTO ofertas_trabajo (id_empresa, titulo, descripcion, requisitos, salario)
-      VALUES (${id_empresa}, ${titulo}, ${descripcion}, ${requisitos}, ${salario})
+      INSERT INTO ofertas_trabajo (id_empresa, titulo, descripcion, requisitos,ubicacion, salario)
+      VALUES (${id_empresa}, ${titulo}, ${descripcion}, ${requisitos}, ${ubicacion}, ${salario})
     `;
 
     res.status(201).json({ mensaje: 'Oferta registrada correctamente' });

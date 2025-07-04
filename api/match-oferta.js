@@ -58,10 +58,35 @@ export default async function handler(req, res) {
       await sql`
         INSERT INTO matches (id_cv, id_oferta, score_match)
         VALUES (${cv.id_cv}, ${id_oferta}, ${puntuacion})
+        ON CONFLICT (id_cv, id_oferta)
+        DO UPDATE SET score_match = EXCLUDED.score_match, fecha = CURRENT_TIMESTAMP
       `
     }
 
-    return res.status(200).json({ resultados })
+    const matches = await sql`
+      SELECT 
+        m.id_match,
+        m.score_match,
+        m.fecha,
+        c.id_cv,
+        c.nombre_completo AS nombre_postulante,
+        c.resumen_profesional,
+        o.id_oferta,
+        o.titulo,
+        o.requisitos,
+        o.ubicacion,
+        o.salario,
+        e.nombre AS nombre_empresa,
+        e.rubro
+      FROM matches m
+      JOIN cv_postulante c ON m.id_cv = c.id_cv
+      JOIN ofertas_trabajo o ON m.id_oferta = o.id_oferta
+      JOIN empresa e ON o.id_empresa = e.id_empresa
+      WHERE m.id_oferta = ${id_oferta}
+      ORDER BY m.score_match DESC
+    `
+
+    return res.status(200).json({ matches })
 
   } catch (err) {
     return res.status(500).json({
