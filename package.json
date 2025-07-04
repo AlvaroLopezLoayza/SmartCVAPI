@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "postgres": "^3.4.3"
+    "postgres": "^3.4.3",
+    "@google/generative-ai": "^0.5.0"
   }
 }
