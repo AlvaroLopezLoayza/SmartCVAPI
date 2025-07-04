@@ -83,10 +83,9 @@ Salario: ${o.salario}`).join('\n\n')}
       recomendaciones.push({
         nombre_empresa: match[1].trim(),
         titulo: match[2].trim(),
-        rubro: match[3].trim(),
-        ubicacion: match[4].trim(),
-        requisitos: match[5].trim(),
-        score_match: Number(match[6])
+        ubicacion: match[3].trim(),
+        requisitos: match[4].trim(),
+        score_match: Number(match[5])
       })
     }
 
