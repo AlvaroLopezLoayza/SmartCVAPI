@@ -1,55 +1,72 @@
-import sql from './db.js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+import sql from './db.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' });
+    return res.status(405).json({ error: 'Método no permitido' })
   }
 
   try {
-    const { id_oferta } = req.body;
-    const oferta = await sql`SELECT * FROM ofertas_trabajo WHERE id_oferta = ${id_oferta}`;
+    let body = ''
+    for await (const chunk of req) body += chunk
+    const { id_oferta } = JSON.parse(body)
+
+    if (!id_oferta) {
+      return res.status(400).json({ error: 'Falta el id de la oferta' })
+    }
+
+    // 1. Obtener la descripción de la oferta
+    const oferta = await sql`
+      SELECT descripcion FROM ofertas_trabajo WHERE id_oferta = ${id_oferta}
+    `
     if (oferta.length === 0) {
-      return res.status(404).json({ error: 'Oferta no encontrada' });
+      return res.status(404).json({ error: 'Oferta no encontrada' })
     }
 
-    const cvs = await sql`SELECT * FROM cv_postulante`;
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const descripcionOferta = oferta[0].descripcion
 
-    const resultados = [];
+    // 2. Obtener todos los CVs
+    const cvs = await sql`
+      SELECT id_cv, resumen_profesional FROM cv_postulante
+    `
 
+    // 3. Enviar la descripción + cada CV al modelo para obtener una puntuación
+    const resultados = []
     for (const cv of cvs) {
-      const prompt = `
-        Dado el siguiente requerimiento de una oferta laboral:
-        ${oferta[0].requisitos}
+      const prompt = `Evalúa la compatibilidad entre esta oferta de trabajo: "${descripcionOferta}" y este CV: "${cv.resumen_profesional}". Devuelve un puntaje entre 0 y 100 sin explicaciones.`
+      
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-goog-api-key': process.env.GEMINI_API_KEY
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      })
 
-        Y el siguiente CV:
-        ${cv.resumen_profesional}
-        Habilidades: ${cv.habilidades}
-        Educación: ${cv.educacion}
-        Experiencia: ${cv.experiencia}
+      const result = await response.json()
+      const texto = result?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      const puntuacion = parseFloat(texto.match(/\d+/)?.[0]) || 0
 
-        Evalúa de 0 a 100 qué tan bien se ajusta el CV al perfil requerido. Devuelve solo el número.
-      `;
+      resultados.push({
+        id_cv: cv.id_cv,
+        score_match: puntuacion
+      })
 
-      const response = await model.generateContent(prompt);
-      const score = parseFloat(response.response.text.trim());
-      resultados.push({ id_cv: cv.id_cv, score });
-    }
-
-    // (Opcional) Guardar en tabla de matches
-    for (const r of resultados) {
+      // (opcional) guardar en tabla de matches
       await sql`
         INSERT INTO matches (id_cv, id_oferta, score_match)
-        VALUES (${r.id_cv}, ${id_oferta}, ${r.score})
-        ON CONFLICT (id_cv, id_oferta) DO UPDATE SET score_match = EXCLUDED.score_match
-      `;
+        VALUES (${cv.id_cv}, ${id_oferta}, ${puntuacion})
+      `
     }
 
-    res.status(200).json(resultados);
+    return res.status(200).json({ resultados })
+
   } catch (err) {
-    res.status(500).json({ error: 'Error al generar recomendaciones', detalle: err.message });
+    return res.status(500).json({
+      error: 'Error al generar recomendaciones',
+      detalle: err.message
+    })
   }
 }
