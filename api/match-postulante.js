@@ -11,7 +11,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Obtener CV del postulante
     const [cv] = await sql`
       SELECT * FROM cv_postulante WHERE id_usuario = ${id_usuario}
     `
@@ -19,7 +18,6 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'CV no encontrado' })
     }
 
-    // Obtener todas las ofertas con empresa incluida
     const ofertas = await sql`
       SELECT o.*, e.nombre AS empresa
       FROM ofertas_trabajo o
@@ -29,9 +27,19 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'No hay ofertas registradas' })
     }
 
-    // Construir el prompt
     const prompt = `
-Eres un sistema experto en emparejamiento laboral. A continuación tienes el CV de un postulante y varias ofertas de trabajo. Tu tarea es recomendar las 3 ofertas más adecuadas para este perfil, explicando brevemente por qué.
+Eres un sistema experto en emparejamiento laboral. A continuación tienes el CV de un postulante y varias ofertas de trabajo. Tu tarea es recomendar las 3 ofertas más adecuadas para este perfil.
+
+Devuelve las recomendaciones **solo** en el siguiente formato exacto, sin explicaciones adicionales:
+
+Oferta 1:
+Empresa: [nombre]
+Título: [título]
+Ubicación: [ubicación]
+Requisitos: [requisitos clave]
+Puntaje de afinidad: [porcentaje]%
+
+...
 
 CV:
 Nombre: ${cv.nombre_completo}
@@ -50,7 +58,6 @@ Ubicación: ${o.ubicacion}
 Salario: ${o.salario}`).join('\n\n')}
     `.trim()
 
-    // Llamada a Gemini
     const geminiRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
       method: 'POST',
       headers: {
@@ -65,9 +72,7 @@ Salario: ${o.salario}`).join('\n\n')}
     const result = await geminiRes.json()
     const texto = result?.candidates?.[0]?.content?.parts?.[0]?.text || ''
 
-    // Expresión regular para extraer recomendaciones
-    const regex = /Oferta \d+:\s*Empresa: (.+)\s*Título: (.+)\s*Ubicación: (.+)\s*Requisitos: (.+)\s*Puntaje de afinidad: (\d+)%/g
-
+    const regex = /Oferta \d+:\s*Empresa: (.+?)\s*Título: (.+?)\s*Ubicación: (.+?)\s*Requisitos: (.+?)\s*Puntaje de afinidad: (\d+)%/g
     let match
     const recomendaciones = []
 
@@ -82,11 +87,10 @@ Salario: ${o.salario}`).join('\n\n')}
     }
 
     res.status(200).json({
-      resumen: 'Resultado generado con éxito',
+      resumen: recomendaciones.length > 0 ? 'Recomendaciones encontradas' : 'Sin coincidencias con el formato esperado',
       prompt_usado: prompt,
       texto_generado: texto,
-      rawGeminiResponse: result,
-      recomendaciones: recomendaciones.length > 0 ? recomendaciones : 'No se encontraron coincidencias con el regex.'
+      recomendaciones
     })
   } catch (error) {
     res.status(500).json({
