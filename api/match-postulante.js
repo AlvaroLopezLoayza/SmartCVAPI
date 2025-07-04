@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'No hay ofertas registradas' })
     }
 
-    // Armar el prompt para Gemini
+    // Construir el prompt
     const prompt = `
 Eres un sistema experto en emparejamiento laboral. A continuación tienes el CV de un postulante y varias ofertas de trabajo. Tu tarea es recomendar las 3 ofertas más adecuadas para este perfil, explicando brevemente por qué.
 
@@ -50,7 +50,7 @@ Ubicación: ${o.ubicacion}
 Salario: ${o.salario}`).join('\n\n')}
     `.trim()
 
-    // Llamada a Gemini con fetch
+    // Llamada a Gemini
     const geminiRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
       method: 'POST',
       headers: {
@@ -64,18 +64,10 @@ Salario: ${o.salario}`).join('\n\n')}
 
     const result = await geminiRes.json()
     const texto = result?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    
-    // Extraer las 3 ofertas recomendadas del texto de Gemini
-    // Se asume que Gemini responde con bloques tipo:
-    // Oferta 1:
-    // Empresa: ...
-    // Título: ...
-    // Ubicación: ...
-    // Requisitos: ...
-    // Puntaje de afinidad: ...%
 
-    // Regex para capturar los datos de cada oferta recomendada
+    // Expresión regular para extraer recomendaciones
     const regex = /Oferta \d+:\s*Empresa: (.+)\s*Título: (.+)\s*Ubicación: (.+)\s*Requisitos: (.+)\s*Puntaje de afinidad: (\d+)%/g
+
     let match
     const recomendaciones = []
 
@@ -89,7 +81,13 @@ Salario: ${o.salario}`).join('\n\n')}
       })
     }
 
-    res.status(200).json({ recomendaciones })
+    res.status(200).json({
+      resumen: 'Resultado generado con éxito',
+      prompt_usado: prompt,
+      texto_generado: texto,
+      rawGeminiResponse: result,
+      recomendaciones: recomendaciones.length > 0 ? recomendaciones : 'No se encontraron coincidencias con el regex.'
+    })
   } catch (error) {
     res.status(500).json({
       error: 'Error al generar recomendaciones',
