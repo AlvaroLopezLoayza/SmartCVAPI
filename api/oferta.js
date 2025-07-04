@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     }
 
     await sql`
-      INSERT INTO oferta_laboral (id_empresa, titulo, descripcion, requisitos, salario)
+      INSERT INTO ofertas_trabajo (id_empresa, titulo, descripcion, requisitos, salario)
       VALUES (${id_empresa}, ${titulo}, ${descripcion}, ${requisitos}, ${salario})
     `;
 

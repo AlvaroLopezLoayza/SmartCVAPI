@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   try {
     const ofertas = await sql`
       SELECT o.*, e.nombre AS empresa
-      FROM oferta_laboral o
+      FROM ofertas_trabajo o
       JOIN empresa e ON o.id_empresa = e.id_empresa
     `;
     res.status(200).json(ofertas);
