@@ -34,6 +34,7 @@ export default async function handler(req, res) {
       mensaje: 'Inicio de sesión exitoso',
       usuario: {
         id_usuario: usuario.id_usuario,
+        nombre: usuario.nombre,
         correo: usuario.correo,
         tipo_usuario: usuario.tipo_usuario
       }

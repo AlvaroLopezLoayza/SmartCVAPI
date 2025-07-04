@@ -9,9 +9,9 @@ export default async function handler(req, res) {
   try {
     let body = '';
     for await (const chunk of req) body += chunk;
-    const { correo, clave, tipo_usuario } = JSON.parse(body);
+    const { nombre, correo, clave, tipo_usuario } = JSON.parse(body);
 
-    if (!correo || !clave || !tipo_usuario) {
+    if (!nombre || !correo || !clave || !tipo_usuario) {
       return res.status(400).json({ error: 'Faltan campos requeridos' });
     }
 
@@ -27,8 +27,8 @@ export default async function handler(req, res) {
 
     // Guardar usuario con clave encriptada
     await sql`
-      INSERT INTO usuarios (correo, clave, tipo_usuario)
-      VALUES (${correo}, ${hashedPassword}, ${tipo_usuario})
+      INSERT INTO usuarios (nombre, correo, clave, tipo_usuario)
+      VALUES (${nombre}, ${correo}, ${hashedPassword}, ${tipo_usuario})
     `;
 
     return res.status(201).json({ mensaje: 'Usuario registrado con éxito' });
