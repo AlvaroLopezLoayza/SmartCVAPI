@@ -1,0 +1,10 @@
+{
+  "name": "my-vercel-api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "postgres": "^3.4.3"
+  }
+}
