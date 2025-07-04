@@ -4,35 +4,52 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Método no permitido' });
-
-  const { id_oferta } = req.query;
-  if (!id_oferta) return res.status(400).json({ error: 'ID de oferta requerido' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido' });
+  }
 
   try {
-    const [oferta] = await sql`SELECT * FROM oferta_laboral WHERE id_oferta = ${id_oferta}`;
+    const { id_oferta } = req.body;
+    const oferta = await sql`SELECT * FROM ofertas_trabajo WHERE id_oferta = ${id_oferta}`;
+    if (oferta.length === 0) {
+      return res.status(404).json({ error: 'Oferta no encontrada' });
+    }
+
     const cvs = await sql`SELECT * FROM cv_postulante`;
-
-    if (!oferta) return res.status(404).json({ error: 'Oferta no encontrada' });
-
-    const prompt = `
-      Eres un sistema de emparejamiento laboral. Evalúa los siguientes CVs y recomienda los 3 mejores para esta oferta:
-
-      Oferta:
-      Título: ${oferta.titulo}
-      Requisitos: ${oferta.requisitos}
-      Descripción: ${oferta.descripcion}
-
-      CVs:
-      ${cvs.map(c => `Nombre: ${c.nombre_completo}\nExperiencia: ${c.experiencia}\nEducación: ${c.educacion}\nHabilidades: ${c.habilidades}\nResumen: ${c.resumen_profesional}`).join('\n---\n')}
-    `;
-
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const result = await model.generateContent(prompt);
-    const content = result.response.text();
 
-    res.status(200).json({ recomendaciones: content });
-  } catch (error) {
-    res.status(500).json({ error: 'Error al generar recomendaciones', detalle: error.message });
+    const resultados = [];
+
+    for (const cv of cvs) {
+      const prompt = `
+        Dado el siguiente requerimiento de una oferta laboral:
+        ${oferta[0].requisitos}
+
+        Y el siguiente CV:
+        ${cv.resumen_profesional}
+        Habilidades: ${cv.habilidades}
+        Educación: ${cv.educacion}
+        Experiencia: ${cv.experiencia}
+
+        Evalúa de 0 a 100 qué tan bien se ajusta el CV al perfil requerido. Devuelve solo el número.
+      `;
+
+      const response = await model.generateContent(prompt);
+      const score = parseFloat(response.response.text.trim());
+      resultados.push({ id_cv: cv.id_cv, score });
+    }
+
+    // (Opcional) Guardar en tabla de matches
+    for (const r of resultados) {
+      await sql`
+        INSERT INTO matches (id_cv, id_oferta, score_match)
+        VALUES (${r.id_cv}, ${id_oferta}, ${r.score})
+        ON CONFLICT (id_cv, id_oferta) DO UPDATE SET score_match = EXCLUDED.score_match
+      `;
+    }
+
+    res.status(200).json(resultados);
+  } catch (err) {
+    res.status(500).json({ error: 'Error al generar recomendaciones', detalle: err.message });
   }
 }
